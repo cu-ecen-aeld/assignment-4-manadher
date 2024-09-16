@@ -1,27 +1,40 @@
 name: assignment-test
 on:
-    push:
-        tags-ignore:
-            - '*'
-        branches:
-            - '*'
+  push:
+    tags-ignore:
+      - '*'
+    branches:
+      - '*'
 jobs:
-    full-test:
-        container: cuaesd/aesd-autotest:assignment4-buildroot
-        runs-on: self-hosted
-        timeout-minutes: 120
-        steps:
-          - uses: actions/checkout@v2
-          - name: Checkout submodules
-            run: git submodule update --init --recursive
-          - uses: webfactory/ssh-agent@v0.5.3
-            with:
-                ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          - name: Run full test
-            env:
-              GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-            run: ./full-test.sh
-          - name: Cleanup
-            if: always()
-            run: |
-              ssh-add -D
+  full-test:
+    container: cuaesd/aesd-autotest:assignment4-buildroot
+    runs-on: self-hosted
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checkout submodules (public)
+        run: git submodule update --init --recursive --depth 1 # Add --depth 1 for faster public clones
+
+      - name: Install SSH key (for private submodules)
+        uses: shimataro/ssh-keys@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: "" # Add known_hosts content if needed
+
+      - name: Checkout submodules (private)
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          # List your private submodules here, separated by spaces
+          git submodule update --init --recursive <private-submodule-1> <private-submodule-2> 
+
+      - name: Run full test
+        env:
+          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no" # Consider removing this if not needed
+        run: ./full-test.sh
+
+      - name: Cleanup
+        if: always()
+        run: |
+          ssh-add -D
